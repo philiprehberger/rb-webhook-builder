@@ -3,6 +3,7 @@
 [![Tests](https://github.com/philiprehberger/rb-webhook-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-webhook-builder/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-webhook_builder.svg)](https://rubygems.org/gems/philiprehberger-webhook_builder)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-webhook-builder)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Webhook delivery client with HMAC signing, retry, and tracking
 
