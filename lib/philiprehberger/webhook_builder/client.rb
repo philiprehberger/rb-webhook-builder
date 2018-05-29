@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require "net/http"
-require "uri"
-require "json"
-require "openssl"
-require "time"
+require 'net/http'
+require 'uri'
+require 'json'
+require 'openssl'
+require 'time'
 
 module Philiprehberger
   module WebhookBuilder
@@ -91,7 +91,7 @@ module Philiprehberger
       # @param body [String] the JSON body
       # @return [String] the hex-encoded HMAC signature
       def sign(body)
-        OpenSSL::HMAC.hexdigest("SHA256", @secret, body)
+        OpenSSL::HMAC.hexdigest('SHA256', @secret, body)
       end
 
       # Send the HTTP POST request.
@@ -103,15 +103,15 @@ module Philiprehberger
       def send_request(body, signature, event)
         uri = URI.parse(@url)
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = uri.scheme == "https"
+        http.use_ssl = uri.scheme == 'https'
         http.open_timeout = @timeout
         http.read_timeout = @timeout
 
         request = Net::HTTP::Post.new(uri.request_uri)
-        request["Content-Type"] = "application/json"
-        request["X-Webhook-Signature"] = signature
-        request["X-Webhook-Event"] = event
-        request["User-Agent"] = "philiprehberger-webhook_builder/#{VERSION}"
+        request['Content-Type'] = 'application/json'
+        request['X-Webhook-Signature'] = signature
+        request['X-Webhook-Event'] = event
+        request['User-Agent'] = "philiprehberger-webhook_builder/#{VERSION}"
         request.body = body
 
         http.request(request)
