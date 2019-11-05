@@ -2,7 +2,11 @@
 
 [![Tests](https://github.com/philiprehberger/rb-webhook-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-webhook-builder/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-webhook_builder.svg)](https://rubygems.org/gems/philiprehberger-webhook_builder)
+[![GitHub release](https://img.shields.io/github/v/release/philiprehberger/rb-webhook-builder)](https://github.com/philiprehberger/rb-webhook-builder/releases)
+[![Last updated](https://img.shields.io/github/last-commit/philiprehberger/rb-webhook-builder)](https://github.com/philiprehberger/rb-webhook-builder/commits/main)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-webhook-builder)](LICENSE)
+[![Bug Reports](https://img.shields.io/github/issues/philiprehberger/rb-webhook-builder/bug)](https://github.com/philiprehberger/rb-webhook-builder/issues?q=is%3Aissue+is%3Aopen+label%3Abug)
+[![Feature Requests](https://img.shields.io/github/issues/philiprehberger/rb-webhook-builder/enhancement)](https://github.com/philiprehberger/rb-webhook-builder/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement)
 [![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Webhook delivery client with HMAC signing, retry, and tracking
@@ -40,20 +44,91 @@ delivery.success?      # => true
 delivery.response_code # => 200
 ```
 
-### Custom Options
+### Batch Delivery
 
 ```ruby
+require "philiprehberger/webhook_builder"
+
 client = Philiprehberger::WebhookBuilder.new(
-  url: "https://api.example.com/hooks",
-  secret: "hmac-secret",
-  timeout: 10,
-  max_retries: 5
+  url: "https://example.com/webhooks",
+  secret: "your-signing-secret",
+  concurrency: 8
+)
+
+events = [
+  { event: "order.created", payload: { id: 1 } },
+  { event: "order.updated", payload: { id: 2 } },
+  { event: "order.deleted", payload: { id: 3 } }
+]
+
+results = client.deliver_batch(events)
+results.each { |d| puts "#{d.response_code}: #{d.success?}" }
+```
+
+### Backoff Strategies
+
+```ruby
+require "philiprehberger/webhook_builder"
+
+# Exponential backoff (default): 1s, 2s, 4s, 8s, ...
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  backoff: :exponential
+)
+
+# Linear backoff: 1s, 2s, 3s, 4s, ...
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  backoff: :linear
+)
+
+# Fixed backoff: 1s, 1s, 1s, ...
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  backoff: :fixed
+)
+
+# Custom Proc backoff
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  backoff: ->(attempt) { attempt * 0.5 }
+)
+```
+
+### Header Customization
+
+```ruby
+require "philiprehberger/webhook_builder"
+
+# Default headers on all deliveries
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  default_headers: { "X-Tenant" => "acme" }
+)
+
+# Per-delivery headers (override defaults)
+client.deliver(
+  event: "order.created",
+  payload: { id: 1 },
+  headers: { "X-Priority" => "high" }
 )
 ```
 
 ### Delivery Tracking
 
 ```ruby
+require "philiprehberger/webhook_builder"
+
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret"
+)
+
 delivery = client.deliver(event: "user.updated", payload: { id: 42 })
 
 delivery.success?       # => true/false
@@ -64,18 +139,15 @@ delivery.response_body  # => '{"ok":true}'
 delivery.error          # => nil or error message
 ```
 
-### HMAC Signing
-
-Every request includes an `X-Webhook-Signature` header with an HMAC-SHA256 hex digest of the JSON body, signed with the configured secret. The `X-Webhook-Event` header contains the event type.
-
 ## API
 
 ### `Client`
 
 | Method | Description |
 |--------|-------------|
-| `.new(url:, secret:, timeout:, max_retries:)` | Create a webhook client (timeout defaults to 30s, retries to 3) |
-| `#deliver(event:, payload:)` | Deliver a webhook event and return a Delivery |
+| `.new(url:, secret:, timeout:, max_retries:, backoff:, concurrency:, default_headers:)` | Create a webhook client |
+| `#deliver(event:, payload:, headers:)` | Deliver a webhook event and return a Delivery |
+| `#deliver_batch(events)` | Deliver multiple events concurrently and return an array of Delivery results |
 
 ### `Delivery`
 
@@ -88,6 +160,27 @@ Every request includes an `X-Webhook-Signature` header with an HMAC-SHA256 hex d
 | `#response_body` | The response body string |
 | `#error` | Error message if delivery failed |
 
+### `Backoff::Exponential`
+
+| Method | Description |
+|--------|-------------|
+| `.new(base:, max_delay:, jitter:)` | Create exponential strategy (defaults: base=1, max_delay=30, jitter=false) |
+| `#call(attempt)` | Calculate delay for given attempt |
+
+### `Backoff::Linear`
+
+| Method | Description |
+|--------|-------------|
+| `.new(base:, max_delay:)` | Create linear strategy (defaults: base=1, max_delay=30) |
+| `#call(attempt)` | Calculate delay for given attempt |
+
+### `Backoff::Fixed`
+
+| Method | Description |
+|--------|-------------|
+| `.new(delay:)` | Create fixed strategy (default: delay=1) |
+| `#call(attempt)` | Returns constant delay |
+
 ## Development
 
 ```bash
@@ -96,6 +189,13 @@ bundle exec rspec
 bundle exec rubocop
 ```
 
+## Support
+
+If you find this package useful, consider giving it a star on GitHub — it helps motivate continued maintenance and development.
+
+[![LinkedIn](https://img.shields.io/badge/Philip%20Rehberger-LinkedIn-0A66C2?logo=linkedin)](https://www.linkedin.com/in/philiprehberger)
+[![More packages](https://img.shields.io/badge/more-open%20source%20packages-blue)](https://philiprehberger.com/open-source-packages)
+
 ## License
 
-MIT
+[MIT](LICENSE)

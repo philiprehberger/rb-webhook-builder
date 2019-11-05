@@ -17,4 +17,5 @@ end
 
 require_relative 'webhook_builder/version'
 require_relative 'webhook_builder/delivery'
+require_relative 'webhook_builder/backoff'
 require_relative 'webhook_builder/client'

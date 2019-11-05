@@ -10,8 +10,9 @@ Gem::Specification.new do |spec|
 
   spec.summary = 'Webhook delivery client with HMAC signing, retry, and tracking'
   spec.description = 'A webhook delivery client that signs payloads with HMAC-SHA256, ' \
-                     'retries failed deliveries with exponential backoff, and tracks ' \
-                     'delivery status including response codes, attempts, and duration.'
+                     'retries failed deliveries with configurable backoff strategies, ' \
+                     'supports batch delivery, custom headers, and tracks delivery status ' \
+                     'including response codes, attempts, and duration.'
   spec.homepage = 'https://github.com/philiprehberger/rb-webhook-builder'
   spec.license = 'MIT'
 
