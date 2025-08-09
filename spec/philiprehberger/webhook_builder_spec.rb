@@ -392,6 +392,35 @@ RSpec.describe Philiprehberger::WebhookBuilder::Client do
     end
   end
 
+  describe '#verify_signature' do
+    let(:body) { '{"event":"order.created","payload":{"id":1}}' }
+    let(:valid_signature) { OpenSSL::HMAC.hexdigest('SHA256', 'test-secret', body) }
+
+    it 'returns true when signature matches body and secret' do
+      expect(client.verify_signature(body: body, signature: valid_signature)).to be true
+    end
+
+    it 'returns false when the body has been tampered with' do
+      tampered = "#{body} "
+      expect(client.verify_signature(body: tampered, signature: valid_signature)).to be false
+    end
+
+    it 'returns false when the client uses a different secret' do
+      other_client = described_class.new(url: 'https://example.com/webhook', secret: 'other-secret')
+      expect(other_client.verify_signature(body: body, signature: valid_signature)).to be false
+    end
+
+    it 'returns false for a signature of wrong length without raising' do
+      expect { client.verify_signature(body: body, signature: 'abc123') }.not_to raise_error
+      expect(client.verify_signature(body: body, signature: 'abc123')).to be false
+    end
+
+    it 'returns true for an empty body with a matching signature' do
+      empty_signature = OpenSSL::HMAC.hexdigest('SHA256', 'test-secret', '')
+      expect(client.verify_signature(body: '', signature: empty_signature)).to be true
+    end
+  end
+
   describe '#deliver_batch' do
     it 'delivers multiple events and returns results in order' do
       stub_http(success_response)

@@ -137,6 +137,22 @@ module Philiprehberger
         results
       end
 
+      # Verify an HMAC-SHA256 signature against a raw request body.
+      #
+      # Uses a constant-time comparison to resist timing attacks. Returns
+      # +false+ (never raises) when the provided signature has a different
+      # length than the expected hex digest.
+      #
+      # @param body [String] the raw request body
+      # @param signature [String] the hex-encoded signature to verify
+      # @return [Boolean] true when the signature matches, false otherwise
+      def verify_signature(body:, signature:)
+        expected = sign(body)
+        return false unless signature.is_a?(String) && signature.bytesize == expected.bytesize
+
+        OpenSSL.fixed_length_secure_compare(expected, signature)
+      end
+
       private
 
       # Sign the request body with HMAC-SHA256.

@@ -114,6 +114,26 @@ client.deliver(
 )
 ```
 
+### Verifying signatures
+
+On the receiving side, use the same secret to verify the signature sent in the
+`X-Webhook-Signature` header. The comparison is constant-time and will never
+raise on malformed input.
+
+```ruby
+require "philiprehberger/webhook_builder"
+
+secret = "shared-signing-secret"
+sender = Philiprehberger::WebhookBuilder.new(url: "https://example.com/webhooks", secret: secret)
+receiver = Philiprehberger::WebhookBuilder.new(url: "https://example.com/webhooks", secret: secret)
+
+body = '{"event":"order.created","payload":{"id":1}}'
+signature = OpenSSL::HMAC.hexdigest("SHA256", secret, body)
+
+receiver.verify_signature(body: body, signature: signature) # => true
+receiver.verify_signature(body: body, signature: "tampered") # => false
+```
+
 ### Delivery Tracking
 
 ```ruby
@@ -143,6 +163,7 @@ delivery.error          # => nil or error message
 | `.new(url:, secret:, timeout:, max_retries:, backoff:, concurrency:, default_headers:)` | Create a webhook client |
 | `#deliver(event:, payload:, headers:)` | Deliver a webhook event and return a Delivery |
 | `#deliver_batch(events)` | Deliver multiple events concurrently and return an array of Delivery results |
+| `#verify_signature(body:, signature:)` | Constant-time HMAC-SHA256 verification of an incoming signature; returns `true`/`false` and never raises |
 
 ### `Delivery`
 
