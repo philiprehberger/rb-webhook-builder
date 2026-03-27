@@ -15,6 +15,6 @@ module Philiprehberger
   end
 end
 
-require_relative "webhook_builder/version"
-require_relative "webhook_builder/delivery"
-require_relative "webhook_builder/client"
+require_relative 'webhook_builder/version'
+require_relative 'webhook_builder/delivery'
+require_relative 'webhook_builder/client'
