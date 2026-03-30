@@ -19,27 +19,42 @@ module Philiprehberger
       # @return [Integer] the maximum number of delivery attempts
       attr_reader :max_retries
 
+      # @return [Integer] the maximum number of concurrent batch deliveries
+      attr_reader :concurrency
+
+      # @return [Hash] default headers included in every delivery
+      attr_reader :default_headers
+
       # Create a new webhook client.
       #
       # @param url [String] the webhook endpoint URL
       # @param secret [String] the HMAC-SHA256 signing secret
       # @param timeout [Integer] HTTP timeout in seconds (default: 30)
       # @param max_retries [Integer] maximum retry attempts on failure (default: 3)
-      def initialize(url:, secret:, timeout: 30, max_retries: 3)
+      # @param backoff [Symbol, Proc] backoff strategy — :exponential (default), :linear, :fixed, or a Proc
+      # @param concurrency [Integer] maximum concurrent threads for batch delivery (default: 4)
+      # @param default_headers [Hash] headers to include in every delivery
+      def initialize(url:, secret:, timeout: 30, max_retries: 3, backoff: :exponential, concurrency: 4,
+                     default_headers: {})
         @url = url
         @secret = secret
         @timeout = timeout
         @max_retries = max_retries
+        @backoff_strategy = Backoff.resolve(backoff)
+        @concurrency = concurrency
+        @default_headers = default_headers.dup.freeze
       end
 
       # Deliver a webhook event.
       #
       # @param event [String] the event type (e.g., "order.created")
       # @param payload [Hash] the event payload
+      # @param headers [Hash] per-delivery headers (override default_headers)
       # @return [Delivery] the delivery result
-      def deliver(event:, payload:)
+      def deliver(event:, payload:, headers: {})
         body = JSON.generate({ event: event, payload: payload, timestamp: Time.now.utc.iso8601 })
         signature = sign(body)
+        merged_headers = @default_headers.merge(headers)
 
         attempts = 0
         start_time = monotonic_now
@@ -50,7 +65,7 @@ module Philiprehberger
         loop do
           attempts += 1
           begin
-            response = send_request(body, signature, event)
+            response = send_request(body, signature, event, merged_headers)
             last_response_code = response.code.to_i
             last_response_body = response.body
 
@@ -71,7 +86,7 @@ module Philiprehberger
 
           break if attempts > @max_retries
 
-          sleep(backoff_delay(attempts))
+          sleep(@backoff_strategy.call(attempts))
         end
 
         Delivery.new(
@@ -82,6 +97,44 @@ module Philiprehberger
           response_body: last_response_body,
           error: last_error
         )
+      end
+
+      # Deliver multiple webhook events concurrently.
+      #
+      # @param events [Array<Hash>] array of { event:, payload: } hashes, optionally with headers:
+      # @return [Array<Delivery>] delivery results in the same order as input
+      def deliver_batch(events)
+        results = Array.new(events.length)
+        mutex = Mutex.new
+        queue = Queue.new
+
+        events.each_with_index do |item, index|
+          queue << [item, index]
+        end
+
+        threads = Array.new([@concurrency, events.length].min) do
+          Thread.new do
+            loop do
+              pair = begin
+                queue.pop(true)
+              rescue ThreadError
+                nil
+              end
+              break unless pair
+
+              item, index = pair
+              delivery = deliver(
+                event: item[:event],
+                payload: item[:payload],
+                headers: item.fetch(:headers, {})
+              )
+              mutex.synchronize { results[index] = delivery }
+            end
+          end
+        end
+
+        threads.each(&:join)
+        results
       end
 
       private
@@ -99,8 +152,9 @@ module Philiprehberger
       # @param body [String] the JSON body
       # @param signature [String] the HMAC signature
       # @param event [String] the event type
+      # @param extra_headers [Hash] additional headers to include
       # @return [Net::HTTPResponse]
-      def send_request(body, signature, event)
+      def send_request(body, signature, event, extra_headers = {})
         uri = URI.parse(@url)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = uri.scheme == 'https'
@@ -112,17 +166,12 @@ module Philiprehberger
         request['X-Webhook-Signature'] = signature
         request['X-Webhook-Event'] = event
         request['User-Agent'] = "philiprehberger-webhook_builder/#{VERSION}"
+
+        extra_headers.each { |key, value| request[key] = value }
+
         request.body = body
 
         http.request(request)
-      end
-
-      # Calculate exponential backoff delay.
-      #
-      # @param attempt [Integer] the current attempt number
-      # @return [Float] delay in seconds
-      def backoff_delay(attempt)
-        [2**(attempt - 1), 30].min
       end
 
       def monotonic_now

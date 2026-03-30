@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-29
+
+### Added
+- Batch delivery via `client.deliver_batch(events)` with configurable `concurrency:` option
+- Retry backoff strategies: `:exponential` (default), `:linear`, `:fixed`, or custom Proc via `backoff:` option
+- Backoff strategy classes in `Philiprehberger::WebhookBuilder::Backoff` module
+- Header customization with per-delivery `headers:` parameter and client-level `default_headers:` option
+- Per-delivery headers override default headers
+
 ## [0.1.1] - 2026-03-22
 
 ### Changed
