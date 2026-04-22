@@ -153,6 +153,18 @@ module Philiprehberger
         OpenSSL.fixed_length_secure_compare(expected, signature)
       end
 
+      # Compute the HMAC-SHA256 hex signature this client would send for the given body.
+      #
+      # Mirrors +verify_signature+: the signature returned by +signature_for(body:)+
+      # will verify against the same body. Useful when preparing payloads offline or
+      # re-computing signatures without sending a request.
+      #
+      # @param body [String] the raw request body
+      # @return [String] the hex-encoded HMAC signature
+      def signature_for(body:)
+        sign(body)
+      end
+
       private
 
       # Sign the request body with HMAC-SHA256.

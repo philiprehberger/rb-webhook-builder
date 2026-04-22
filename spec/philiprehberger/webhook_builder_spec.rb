@@ -421,6 +421,40 @@ RSpec.describe Philiprehberger::WebhookBuilder::Client do
     end
   end
 
+  describe '#signature_for' do
+    let(:body) { '{"event":"order.created","payload":{"id":1}}' }
+
+    it 'returns the hex HMAC-SHA256 digest of the body with the client secret' do
+      expected = OpenSSL::HMAC.hexdigest('SHA256', 'test-secret', body)
+      expect(client.signature_for(body: body)).to eq(expected)
+    end
+
+    it 'returns a 64-character hex string' do
+      expect(client.signature_for(body: body)).to match(/\A[0-9a-f]{64}\z/)
+    end
+
+    it 'is verifiable by verify_signature against the same body' do
+      signature = client.signature_for(body: body)
+      expect(client.verify_signature(body: body, signature: signature)).to be true
+    end
+
+    it 'produces different signatures for different bodies' do
+      other_body = '{"event":"order.updated","payload":{"id":1}}'
+      expect(client.signature_for(body: body)).not_to eq(client.signature_for(body: other_body))
+    end
+
+    it 'produces a signature a client with a different secret will not verify' do
+      other_client = described_class.new(url: 'https://example.com/webhook', secret: 'other-secret')
+      signature = client.signature_for(body: body)
+      expect(other_client.verify_signature(body: body, signature: signature)).to be false
+    end
+
+    it 'returns the empty-body HMAC for an empty body' do
+      expected = OpenSSL::HMAC.hexdigest('SHA256', 'test-secret', '')
+      expect(client.signature_for(body: '')).to eq(expected)
+    end
+  end
+
   describe '#deliver_batch' do
     it 'delivers multiple events and returns results in order' do
       stub_http(success_response)
