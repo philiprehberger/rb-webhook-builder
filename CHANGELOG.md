@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-22
+
+### Added
+- `Client#signature_for(body:)` — compute the HMAC-SHA256 signature this client would send for a given body without performing a delivery.
+
 ## [0.3.0] - 2026-04-18
 
 ### Added

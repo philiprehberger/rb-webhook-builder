@@ -134,6 +134,24 @@ receiver.verify_signature(body: body, signature: signature) # => true
 receiver.verify_signature(body: body, signature: "tampered") # => false
 ```
 
+You can also compute the signature the client would send for a body without
+performing a delivery — useful for preparing payloads offline or mirroring
+`verify_signature`:
+
+```ruby
+require "philiprehberger/webhook_builder"
+
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "shared-signing-secret"
+)
+
+body = '{"event":"order.created","payload":{"id":1}}'
+signature = client.signature_for(body: body)
+
+client.verify_signature(body: body, signature: signature) # => true
+```
+
 ### Delivery Tracking
 
 ```ruby
@@ -164,6 +182,7 @@ delivery.error          # => nil or error message
 | `#deliver(event:, payload:, headers:)` | Deliver a webhook event and return a Delivery |
 | `#deliver_batch(events)` | Deliver multiple events concurrently and return an array of Delivery results |
 | `#verify_signature(body:, signature:)` | Constant-time HMAC-SHA256 verification of an incoming signature; returns `true`/`false` and never raises |
+| `#signature_for(body:)` | Compute the HMAC-SHA256 signature for a body without sending |
 
 ### `Delivery`
 
