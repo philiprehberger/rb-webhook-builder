@@ -86,6 +86,13 @@ client = Philiprehberger::WebhookBuilder.new(
   backoff: :fixed
 )
 
+# Decorrelated jitter (AWS-style): randomized within [base, min(cap, prev*3)]
+client = Philiprehberger::WebhookBuilder.new(
+  url: "https://example.com/webhooks",
+  secret: "secret",
+  backoff: :decorrelated
+)
+
 # Custom Proc backoff
 client = Philiprehberger::WebhookBuilder.new(
   url: "https://example.com/webhooks",
@@ -215,6 +222,13 @@ delivery.error          # => nil or error message
 |--------|-------------|
 | `.new(delay:)` | Create fixed strategy (default: delay=1) |
 | `#call(attempt)` | Returns constant delay |
+
+### `Backoff::Decorrelated`
+
+| Method | Description |
+|--------|-------------|
+| `.new(base:, max_delay:)` | Create decorrelated jitter strategy (defaults: base=1, max_delay=30) |
+| `#call(attempt)` | Returns randomized delay in `[base, min(max_delay, prev * 3)]` |
 
 ## Development
 

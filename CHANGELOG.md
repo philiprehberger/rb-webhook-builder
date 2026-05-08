@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-08
+
+### Added
+- `Backoff::Decorrelated` — AWS-style decorrelated jitter strategy (`delay = base + rand * (min(cap, prev * 3) - base)`); spreads retries to avoid thundering-herd patterns
+- `Client#new(backoff: :decorrelated)` — `:decorrelated` is now a recognized symbol alongside `:exponential`, `:linear`, `:fixed`, and any callable Proc
+
 ## [0.4.0] - 2026-04-22
 
 ### Added

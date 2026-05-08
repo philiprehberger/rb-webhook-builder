@@ -53,6 +53,30 @@ module Philiprehberger
         end
       end
 
+      # Decorrelated jitter backoff (AWS-style): each delay is a random value
+      # in `[base, [cap, prev * 3].min]`, which spreads retries to avoid
+      # thundering-herd effects while still trending toward the cap.
+      #
+      # See: https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/
+      class Decorrelated
+        # @param base [Numeric] minimum delay in seconds (default: 1)
+        # @param max_delay [Numeric] maximum delay in seconds (default: 30)
+        def initialize(base: 1, max_delay: 30)
+          @base = base.to_f
+          @max_delay = max_delay.to_f
+          @prev = @base
+        end
+
+        # @param _attempt [Integer] ignored (state is carried in @prev)
+        # @return [Float] delay in seconds
+        def call(_attempt)
+          upper = [@max_delay, @prev * 3].min
+          upper = @base if upper < @base
+          @prev = @base + (rand * (upper - @base))
+          @prev
+        end
+      end
+
       # Resolve a backoff option into a callable strategy.
       #
       # @param option [Symbol, Proc, nil] the backoff strategy
@@ -65,10 +89,14 @@ module Philiprehberger
           Linear.new
         when :fixed
           Fixed.new
+        when :decorrelated
+          Decorrelated.new
         when Proc
           option
         else
-          raise ArgumentError, "Unknown backoff strategy: #{option.inspect}. Use :exponential, :linear, :fixed, or a Proc."
+          raise ArgumentError,
+                "Unknown backoff strategy: #{option.inspect}. " \
+                'Use :exponential, :linear, :fixed, :decorrelated, or a Proc.'
         end
       end
     end

@@ -750,6 +750,38 @@ RSpec.describe Philiprehberger::WebhookBuilder::Backoff do
       expect(s.call(10)).to eq(5.0)
     end
   end
+
+  describe Philiprehberger::WebhookBuilder::Backoff::Decorrelated do
+    subject(:strategy) { described_class.new(base: 1, max_delay: 30) }
+
+    it 'returns delays within [base, max_delay]' do
+      100.times do
+        delay = strategy.call(1)
+        expect(delay).to be >= 1.0
+        expect(delay).to be <= 30.0
+      end
+    end
+
+    it 'first call is bounded by [base, base * 3]' do
+      s = described_class.new(base: 1, max_delay: 30)
+      delay = s.call(1)
+      expect(delay).to be >= 1.0
+      expect(delay).to be <= 3.0
+    end
+
+    it 'is randomized — produces varying values across calls' do
+      s = described_class.new(base: 1, max_delay: 30)
+      values = Array.new(20) { s.call(1) }
+      expect(values.uniq.size).to be > 1
+    end
+  end
+
+  describe '.resolve with :decorrelated' do
+    it 'returns a Decorrelated strategy' do
+      strategy = described_class.resolve(:decorrelated)
+      expect(strategy).to be_a(Philiprehberger::WebhookBuilder::Backoff::Decorrelated)
+    end
+  end
 end
 
 RSpec.describe 'Backoff integration with Client' do
